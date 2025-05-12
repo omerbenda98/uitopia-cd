@@ -1,0 +1,23 @@
+- hosts: all
+  become: yes
+  roles: [docker]
+
+- hosts: app
+  roles:
+    - role: app
+      vars:
+        app_tag: "{{ prod_tag }}"
+        mongodb_uri: "{{ lookup('env', 'MONGODB_URI') }}"
+        nextauth_secret: "{{ lookup('env', 'NEXTAUTH_SECRET') }}"
+        google_id: "{{ lookup('env', 'GOOGLE_ID') }}"
+        google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
+
+- hosts: stage
+  roles:
+    - role: app
+      vars:
+        app_tag: "{{ stage_tag }}"
+        mongodb_uri: "{{ lookup('env', 'MONGODB_URI') }}"
+        nextauth_secret: "{{ lookup('env', 'NEXTAUTH_SECRET') }}"
+        google_id: "{{ lookup('env', 'GOOGLE_ID') }}"
+        google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
