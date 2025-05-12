@@ -51,7 +51,7 @@ pipeline {
                 script {
                     env.ENVIRONMENT = 'production'
                     env.VERSION = readFile('production_version.txt').trim()
-                    echo "📦 Extracted Production version from file: ${env.VERSION}"
+                    echo "📦 Extracted production version from file: ${env.VERSION}"
                     
                     withCredentials([
                         string(credentialsId: 'mongodb-uri', variable: 'MONGODB_URI'),
