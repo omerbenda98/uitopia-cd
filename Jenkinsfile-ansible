@@ -1,7 +1,5 @@
 pipeline {
-    agent {
-        label 'node1' 
-    }
+    agent any
     environment {
         email = 'omerbenda98@gmail.com'
     }
@@ -9,7 +7,7 @@ pipeline {
         stage('Deploy with ansible') {
             when { changeset "ansible/**" }
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'node1', keyFileVariable: 'PEM_FILE', usernameVariable: 'SSH_USER')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'ssh', keyFileVariable: 'PEM_FILE', usernameVariable: 'SSH_USER')]) {
                     sh '''
                         export ANSIBLE_HOST_KEY_CHECKING=False
                         chmod 400 $PEM_FILE
