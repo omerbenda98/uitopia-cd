@@ -4,6 +4,14 @@ pipeline {
         email = 'omerbenda98@gmail.com'
     }
     stages {
+        stage('Setup') {
+            steps {
+                sh '''
+                    sudo apt-get update
+                    sudo apt-get install -y ansible
+                '''
+            }
+        }
         stage('Deploy with ansible') {
             when { changeset "ansible/**" }
             steps {
