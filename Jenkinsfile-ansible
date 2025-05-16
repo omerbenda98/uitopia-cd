@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+    agent {
+        label 'node1' 
+    }
     environment {
         email = 'omerbenda98@gmail.com'
     }
