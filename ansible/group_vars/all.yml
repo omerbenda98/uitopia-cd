@@ -1,0 +1,18 @@
+# Docker image details
+app_image: omerbenda98/ui_topia
+stage_tag: 5
+prod_tag: 5
+
+# Application settings
+app_name: ui_topia
+container_name: ui_topia
+app_port: 3000
+
+# Environment-specific configurations
+environments:
+  staging:
+    domain: stage.omerbenda98.com
+    nextauth_url: "http://stage.omerbenda98.com"
+  production:
+    domain: www.omerbenda98.com
+    nextauth_url: "http://www.omerbenda98.com"

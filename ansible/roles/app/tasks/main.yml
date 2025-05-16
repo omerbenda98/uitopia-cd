@@ -1,3 +1,9 @@
+- name: Pull latest Docker image
+  docker_image:
+    name: "omerbenda98/ui_topia:{{ app_tag }}"
+    source: pull
+    force_source: yes
+
 - name: Stop and remove existing container
   docker_container:
     name: ui_topia
@@ -11,9 +17,23 @@
     restart_policy: always
     env:
       MONGODB_URI: "{{ mongodb_uri }}"
-      NEXTAUTH_URL: "http://localhost:3000"
-      NEXTAUTH_URL_INTERNAL: "http://localhost:3000"
+      NEXTAUTH_URL: "{{ environments[environment].nextauth_url }}"
+      NEXTAUTH_URL_INTERNAL: "{{ environments[environment].nextauth_url }}"
       NEXTAUTH_SECRET: "{{ nextauth_secret }}"
       GOOGLE_ID: "{{ google_id }}"
       GOOGLE_CLIENT_SECRET: "{{ google_client_secret }}"
-    ports: "3000:3000"
+    ports: ["3000:3000"]
+
+- name: Wait for container to start
+  shell: docker ps | grep {{ ui_topia }} | grep -q "Up"
+  register: container_status
+  until: container_status.rc == 0
+  retries: 10
+  delay: 5
+  ignore_errors: yes
+
+- name: Set environment variable for Jenkins notification
+  set_fact:
+    ENVIRONMENT: "{{ environment }}"
+    VERSION: "{{ app_tag }}"
+  delegate_to: localhost

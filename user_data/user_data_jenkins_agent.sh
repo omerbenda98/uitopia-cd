@@ -35,3 +35,6 @@ rm -rf chromedriver-linux64.zip chromedriver-linux64
 # Create Jenkins workspace
 sudo mkdir -p /home/ubuntu/jenkins
 sudo chown ubuntu:ubuntu /home/ubuntu/jenkins
+#install ansible
+apt-add-repository --yes --update ppa:ansible/ansible
+apt install -y ansible

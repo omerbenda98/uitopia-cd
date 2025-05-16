@@ -2,7 +2,7 @@
   become: yes
   roles: [docker]
 
-- hosts: app
+- hosts: production
   roles:
     - role: app
       vars:
@@ -12,7 +12,7 @@
         google_id: "{{ lookup('env', 'GOOGLE_ID') }}"
         google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
 
-- hosts: stage
+- hosts: staging
   roles:
     - role: app
       vars:
