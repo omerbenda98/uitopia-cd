@@ -1,8 +1,17 @@
+- name: Remove conflicting packages
+  apt:
+    name: containerd
+    state: absent
+  ignore_errors: yes
+
 - name: install docker
   apt:
     name:
       - docker.io
     update_cache: yes
+    state: present
+    force: yes
+
 - name: Add ubuntu user to docker group
   user:
     name: "{{ ansible_user }}"
