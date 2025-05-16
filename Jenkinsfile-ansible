@@ -25,7 +25,7 @@ pipeline {
                 script {
                     def msg = ''
                     if (env.VERSION && env.ENVIRONMENT) {
-                         msg = "FAILED to deploy ${env.ENVIRONMENT} version ${env.VERSION} "
+                         msg = "FAILED to Deploy ${env.ENVIRONMENT} version ${env.VERSION} "
                     } else {
                          msg = "FAILED "
                     }
