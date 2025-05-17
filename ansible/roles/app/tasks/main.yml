@@ -1,3 +1,9 @@
+- name: Clean up unused Docker images
+  become: yes
+  shell: docker image prune -a -f
+  register: prune_result
+  changed_when: "'Total reclaimed space:' in prune_result.stdout"
+
 - name: Pull latest Docker image
   docker_image:
     name: "omerbenda98/ui_topia:{{ app_tag }}"
