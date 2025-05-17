@@ -11,6 +11,7 @@
         nextauth_secret: "{{ lookup('env', 'NEXTAUTH_SECRET') }}"
         google_id: "{{ lookup('env', 'GOOGLE_ID') }}"
         google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
+        environment: "production"
 
 - hosts: staging
   roles:
@@ -21,3 +22,4 @@
         nextauth_secret: "{{ lookup('env', 'NEXTAUTH_SECRET') }}"
         google_id: "{{ lookup('env', 'GOOGLE_ID') }}"
         google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
+        environment: "staging"

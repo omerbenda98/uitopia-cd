@@ -25,7 +25,7 @@
     ports: ["3000:3000"]
 
 - name: Wait for container to start
-  shell: docker ps | grep {{ ui_topia }} | grep -q "Up"
+  shell: docker ps | grep {{ container_name }} | grep -q "Up"
   register: container_status
   until: container_status.rc == 0
   retries: 10

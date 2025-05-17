@@ -12,7 +12,7 @@ app_port: 3000
 environments:
   staging:
     domain: stage.omerbenda98.com
-    nextauth_url: "http://stage.omerbenda98.com"
+    nextauth_url: "http://34.226.150.3:3000"
   production:
     domain: www.omerbenda98.com
-    nextauth_url: "http://www.omerbenda98.com"
+    nextauth_url: "http://54.164.235.1:3000"
