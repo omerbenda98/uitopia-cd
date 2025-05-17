@@ -1,7 +1,7 @@
 # Docker image details
 app_image: omerbenda98/ui_topia
-stage_tag: 12
-prod_tag: 12
+stage_tag: 3
+prod_tag: 3
 
 # Application settings
 app_name: ui_topia
