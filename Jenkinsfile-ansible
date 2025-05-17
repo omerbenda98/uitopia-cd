@@ -13,7 +13,7 @@ pipeline {
             }
         }
         stage('Deploy with ansible') {
-            when { changeset "ansible/**" }
+            // when { changeset "ansible/**" }
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'ssh', keyFileVariable: 'PEM_FILE', usernameVariable: 'SSH_USER')]) {
                     sh '''

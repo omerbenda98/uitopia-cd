@@ -9,10 +9,5 @@ container_name: ui_topia
 app_port: 3000
 
 # Environment-specific configurations
-environments:
-  staging:
-    domain: stage.omerbenda98.com
-    nextauth_url: "http://34.226.150.3:3000"
-  production:
-    domain: www.omerbenda98.com
-    nextauth_url: "http://54.164.235.1:3000"
+prod_nextauth_url: "http://localhost:3000" # Or use public IP if needed
+stage_nextauth_url: "http://localhost:3000" # Or use public IP if needed
