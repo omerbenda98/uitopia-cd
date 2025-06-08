@@ -2,7 +2,7 @@
 #   become: yes
 #   roles: [docker]
 
-- hosts: production
+- hosts: prod
   roles:
     - role: app
       vars:
@@ -13,7 +13,7 @@
         google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
         nextauth_url: "{{ prod_nextauth_url }}"
 
-- hosts: staging
+- hosts: dev
   roles:
     - role: app
       vars:

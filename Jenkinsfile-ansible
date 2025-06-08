@@ -12,8 +12,45 @@ pipeline {
                 '''
             }
         }
+        stage('Deploy with terraform'){
+            when { changeset "terraform/**" }
+            steps {
+                withAWS(credentials: 'aws') {
+                    sh '''
+                        cd terraform
+                        terraform init
+                        terraform plan
+                        terraform apply -auto-approve
+                    '''
+                }
+        }
+        stage('Push updateed inventory to Git'){
+            when {
+                expression {
+                    return sh(script: '''
+                        cd ansible
+                        git status --porcelain inventory.ini | grep inventory.ini > /dev/null
+                    ''', returnStatus: true) == 0
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github_token', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_TOKEN')]) {
+                sh '''
+                    cd ansible
+
+                    git config user.name "jenkins"
+                    git config user.email "ci@company.com"
+                    git checkout main
+                    git add inventory.ini
+                    git commit -m "🔄 Update inventory from Terraform"
+                    git push https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/yp3yp3/Todo_list-cd.git main
+                '''
+                }
+            }
+        }
+        }
         stage('Deploy with ansible') {
-            // when { changeset "ansible/**" }
+            when { changeset "ansible/**" }
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'ssh', keyFileVariable: 'PEM_FILE', usernameVariable: 'SSH_USER')]) {
                     sh '''

@@ -1,0 +1,14 @@
+---
+- name: Deploy to Production Environment
+  hosts: prod
+  become: yes
+  roles:
+    # - docker
+    - role: app
+      vars:
+        app_tag: "{{ prod_tag }}"
+        mongodb_uri: "{{ lookup('env', 'MONGODB_URI') }}"
+        nextauth_secret: "{{ lookup('env', 'NEXTAUTH_SECRET') }}"
+        google_id: "{{ lookup('env', 'GOOGLE_ID') }}"
+        google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
+        nextauth_url: "{{ stage_nextauth_url }}"

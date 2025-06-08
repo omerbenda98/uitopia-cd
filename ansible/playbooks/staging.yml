@@ -1,0 +1,14 @@
+---
+- name: Deploy to Staging Environment
+  hosts: dev
+  become: yes
+  roles:
+    # - docker
+    - role: app
+      vars:
+        app_tag: "{{ stage_tag }}"
+        mongodb_uri: "{{ lookup('env', 'MONGODB_URI') }}"
+        nextauth_secret: "{{ lookup('env', 'NEXTAUTH_SECRET') }}"
+        google_id: "{{ lookup('env', 'GOOGLE_ID') }}"
+        google_client_secret: "{{ lookup('env', 'GOOGLE_CLIENT_SECRET') }}"
+        nextauth_url: "{{ stage_nextauth_url }}"
