@@ -23,6 +23,7 @@ pipeline {
                         terraform apply -auto-approve
                     '''
                 }
+            }
         }
         stage('Push updateed inventory to Git'){
             when {
