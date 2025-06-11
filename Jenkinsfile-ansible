@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    label 'ec2_agent'
     environment {
         email = 'omerbenda98@gmail.com'
     }
