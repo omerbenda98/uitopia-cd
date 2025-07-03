@@ -1,0 +1,56 @@
+# values-staging.yaml
+namespace: staging
+
+app:
+  name: ui-topia-staging
+  image: omerbenda98/ui_topia
+  tag: latest
+  port: 3000
+  replicas: 1
+
+  # Environment variables
+  env:
+    NODE_ENV: staging
+
+  # Secrets
+  secretRef:
+    name: ui-topia-staging-secret
+
+  # Resource limits (smaller for staging)
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+service:
+  port: 80
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  host: staging.benda.wiki
+
+# No HPA for staging
+hpa:
+  enabled: false
+
+# MongoDB for staging
+mongodb:
+  enabled: true
+  image: mongo
+  tag: "6.0"
+  username: admin
+  password: password123
+  database: share_prompt
+  storage: 5Gi
+  storageClass: gp2
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"

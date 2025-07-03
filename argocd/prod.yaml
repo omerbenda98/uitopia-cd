@@ -1,0 +1,29 @@
+# Production Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ui-topia-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/omerbenda98/uitopia-cd
+    path: helm-charts/uitopia-app
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - values-production.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

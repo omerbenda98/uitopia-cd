@@ -1,0 +1,14 @@
+# Production HPA
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ui-topia-production-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ui-topia-deployment  # This should match your production deployment name
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70

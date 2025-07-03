@@ -1,0 +1,29 @@
+# Staging Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ui-topia-staging
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/omerbenda98/uitopia-cd
+    path: helm-charts/uitopia-app
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - values-staging.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

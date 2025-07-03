@@ -1,0 +1,103 @@
+{{- if .Values.mongodb.enabled }}
+# MongoDB Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: {{ .Values.namespace }}
+type: Opaque
+data:
+  mongodb-username: {{ .Values.mongodb.username | b64enc }}
+  mongodb-password: {{ .Values.mongodb.password | b64enc }}
+
+---
+# MongoDB ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-config
+  namespace: {{ .Values.namespace }}
+data:
+  mongodb-url: "mongodb://mongodb-service:27017"
+  database-name: {{ .Values.mongodb.database | default "myapp" }}
+
+---
+# MongoDB PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.mongodb.storageClass | default "gp2" }}
+  resources:
+    requests:
+      storage: {{ .Values.mongodb.storage }}
+
+---
+# MongoDB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-deployment
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: {{ .Values.mongodb.image }}:{{ .Values.mongodb.tag }}
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongodb-username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongodb-password
+          volumeMounts:
+            - name: mongodb-storage
+              mountPath: /data/db
+          resources:
+            requests:
+              memory: {{ .Values.mongodb.resources.requests.memory | default "512Mi" }}
+              cpu: {{ .Values.mongodb.resources.requests.cpu | default "500m" }}
+            limits:
+              memory: {{ .Values.mongodb.resources.limits.memory | default "1Gi" }}
+              cpu: {{ .Values.mongodb.resources.limits.cpu | default "1000m" }}
+      volumes:
+        - name: mongodb-storage
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
+
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+  type: ClusterIP
+{{- end }}
