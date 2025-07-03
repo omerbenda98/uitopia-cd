@@ -1,0 +1,10 @@
+# Staging ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ui-topia-staging-config
+  namespace: staging
+data:
+  NODE_ENV: "staging"
+  NEXTAUTH_URL: "http://staging.benda.wiki:80" # For your NodePort access
+  NEXTAUTH_URL_INTERNAL: "http://ui-topia-staging-service:80"

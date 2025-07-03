@@ -1,0 +1,80 @@
+# Deployment for Next.js app in Staging
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-topia-staging-deployment
+  namespace: staging
+  labels:
+    app: ui-topia-staging
+    environment: staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ui-topia-staging
+  template:
+    metadata:
+      labels:
+        app: ui-topia-staging
+        environment: staging
+    spec:
+      containers:
+        - name: ui-topia-staging
+          image: omerbenda98/ui_topia:4
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: MONGODB_URI
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-staging-config
+                  key: NEXTAUTH_URL
+            - name: NEXTAUTH_URL_INTERNAL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-staging-config
+                  key: NEXTAUTH_URL_INTERNAL
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: NEXTAUTH_SECRET
+            - name: GOOGLE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: GOOGLE_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: GOOGLE_CLIENT_SECRET
+            # - name: DATABASE_URL
+            #   value: "mongodb://admin:password123@mongodb-service:27017/share_prompt"
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-staging-config
+                  key: NODE_ENV
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-topia-staging-service
+  namespace: staging
+  labels:
+    environment: staging
+spec:
+  selector:
+    app: ui-topia-staging
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+  type: ClusterIP
+---

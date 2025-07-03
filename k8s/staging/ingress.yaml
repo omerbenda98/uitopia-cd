@@ -1,0 +1,23 @@
+# Ingress for staging
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ui-topia-staging-ingress
+  namespace: staging
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: staging.benda.wiki
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: staging.benda.wiki
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui-topia-staging-service # Direct reference
+                port:
+                  number: 80

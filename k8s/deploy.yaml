@@ -1,0 +1,384 @@
+# Production ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ui-topia-production-config
+  namespace: production
+data:
+  NODE_ENV: "production"
+  NEXTAUTH_URL: "http://benda.wiki" # Update with your actual domain
+  NEXTAUTH_URL_INTERNAL: "http://ui-topia-service:80"
+
+---
+# Staging ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ui-topia-staging-config
+  namespace: staging
+data:
+  NODE_ENV: "staging"
+  NEXTAUTH_URL: "http://staging.benda.wiki:80" # For your NodePort access
+  NEXTAUTH_URL_INTERNAL: "http://ui-topia-staging-service:80"
+---
+# Production Secret (for MongoDB Atlas)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ui-topia-production-secret
+  namespace: production
+type: Opaque
+data:
+  # Base64 encoded values for production
+  GOOGLE_ID: "MjQ5MjkxNTIzNjczLTFqdmp1aDE3OGRjc2tmbG1zNzBjYmFsM3NzbTNybjM3LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t"
+  GOOGLE_CLIENT_SECRET: "R09DU1BYLVc0c180bWxxR1dQM3lmS0wzcVd2YnZXQ2V3eF8="
+  NEXTAUTH_SECRET: "UnVSSHl2aFU5cGpFVjVqZlBlMXA4Yi9RTU15cnZYWDIwL1h6cTgycVd6TT0="
+  # Add your MongoDB Atlas connection string here (base64 encoded)
+  MONGODB_URI: "bW9uZ29kYitzcnY6Ly9hZG1pbjpBYTEyMzQ1NiFAY2x1c3RlcjAudTQ1anNkZy5tb25nb2RiLm5ldC8/cmV0cnlXcml0ZXM9dHJ1ZSZ3PW1ham9yaXR5" # Example: mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority
+
+---
+# Staging Secret (for MongoDB pod)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ui-topia-staging-secret
+  namespace: staging
+type: Opaque
+data:
+  # Same OAuth credentials but different MongoDB
+  GOOGLE_ID: "MjQ5MjkxNTIzNjczLTFqdmp1aDE3OGRjc2tmbG1zNzBjYmFsM3NzbTNybjM3LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t"
+  GOOGLE_CLIENT_SECRET: "R09DU1BYLVc0c180bWxxR1dQM3lmS0wzcVd2YnZXQ2V3eF8="
+  NEXTAUTH_SECRET: "UnVSSHl2aFU5cGpFVjVqZlBlMXA4Yi9RTU15cnZYWDIwL1h6cTgycVd6TT0="
+  # Local MongoDB pod connection
+  MONGODB_URI: "bW9uZ29kYjovL2FkbWluOnBhc3N3b3JkMTIzQG1vbmdvZGItc2VydmljZToyNzAxNy9zaGFyZV9wcm9tcHQ/YXV0aFNvdXJjZT1hZG1pbg=="
+---
+# Deployment for Next.js app
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-topia-deployment
+  namespace: production
+  labels:
+    app: ui-topia
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ui-topia
+  template:
+    metadata:
+      labels:
+        app: ui-topia
+    spec:
+      containers:
+        - name: ui-topia
+          image: omerbenda98/ui_topia:4
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            # Non-sensitive config from ConfigMap
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: MONGODB_URI
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-production-config
+                  key: NEXTAUTH_URL
+            - name: NEXTAUTH_URL_INTERNAL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-production-config
+                  key: NEXTAUTH_URL_INTERNAL
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-production-config
+                  key: NODE_ENV
+            # Sensitive data from Secret
+            - name: GOOGLE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: GOOGLE_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: GOOGLE_CLIENT_SECRET
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: NEXTAUTH_SECRET
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+# Service for Next.js app
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-topia-service
+  namespace: production
+spec:
+  selector:
+    app: ui-topia
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP # For Minikube, this will work with `minikube tunnel`
+---
+# Secret for MongoDB credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: staging
+type: Opaque
+data:
+  # Base64 encoded values
+  # username: admin (YWRtaW4=)
+  # password: password123 (cGFzc3dvcmQxMjM=)
+  mongodb-username: YWRtaW4=
+  mongodb-password: cGFzc3dvcmQxMjM=
+
+---
+# ConfigMap for MongoDB configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-config
+  namespace: staging
+data:
+  mongodb-url: "mongodb://mongodb-service:27017"
+  database-name: "myapp"
+
+---
+# PersistentVolumeClaim for data storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: staging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp2
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Deployment for MongoDB
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-deployment
+  namespace: staging
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:6.0
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongodb-username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongodb-password
+          volumeMounts:
+            - name: mongodb-storage
+              mountPath: /data/db
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+      volumes:
+        - name: mongodb-storage
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
+
+---
+# Service to expose MongoDB
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: staging
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+  type: ClusterIP
+---
+# Deployment for Next.js app in Staging
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-topia-staging-deployment
+  namespace: staging
+  labels:
+    app: ui-topia-staging
+    environment: staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ui-topia-staging
+  template:
+    metadata:
+      labels:
+        app: ui-topia-staging
+        environment: staging
+    spec:
+      containers:
+        - name: ui-topia-staging
+          image: omerbenda98/ui_topia:4
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: MONGODB_URI
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-staging-config
+                  key: NEXTAUTH_URL
+            - name: NEXTAUTH_URL_INTERNAL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-staging-config
+                  key: NEXTAUTH_URL_INTERNAL
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: NEXTAUTH_SECRET
+            - name: GOOGLE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: GOOGLE_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-staging-secret
+                  key: GOOGLE_CLIENT_SECRET
+            # - name: DATABASE_URL
+            #   value: "mongodb://admin:password123@mongodb-service:27017/share_prompt"
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-staging-config
+                  key: NODE_ENV
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-topia-staging-service
+  namespace: staging
+  labels:
+    environment: staging
+spec:
+  selector:
+    app: ui-topia-staging
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+  type: ClusterIP
+---
+# Ingress for production
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ui-topia-production-ingress
+  namespace: production
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: benda.wiki 
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: benda.wiki
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui-topia-service # Direct reference
+                port:
+                  number: 80
+
+---
+# Ingress for staging
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ui-topia-staging-ingress
+  namespace: staging
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: staging.benda.wiki
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: staging.benda.wiki
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui-topia-staging-service # Direct reference
+                port:
+                  number: 80

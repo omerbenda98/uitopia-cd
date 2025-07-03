@@ -1,0 +1,10 @@
+# Production ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ui-topia-production-config
+  namespace: production
+data:
+  NODE_ENV: "production"
+  NEXTAUTH_URL: "http://benda.wiki" # Update with your actual domain
+  NEXTAUTH_URL_INTERNAL: "http://ui-topia-service:80"

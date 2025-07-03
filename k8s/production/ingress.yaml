@@ -1,0 +1,25 @@
+# Ingress for production
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ui-topia-production-ingress
+  namespace: production
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: benda.wiki 
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: benda.wiki
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui-topia-service # Direct reference
+                port:
+                  number: 80
+
+---

@@ -1,0 +1,97 @@
+# Deployment for Next.js app
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-topia-deployment
+  namespace: production
+  labels:
+    app: ui-topia
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ui-topia
+  template:
+    metadata:
+      labels:
+        app: ui-topia
+    spec:
+      containers:
+        - name: ui-topia
+          image: omerbenda98/ui_topia:4
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            # Non-sensitive config from ConfigMap
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: MONGODB_URI
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-production-config
+                  key: NEXTAUTH_URL
+            - name: NEXTAUTH_URL_INTERNAL
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-production-config
+                  key: NEXTAUTH_URL_INTERNAL
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: ui-topia-production-config
+                  key: NODE_ENV
+            # Sensitive data from Secret
+            - name: GOOGLE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: GOOGLE_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: GOOGLE_CLIENT_SECRET
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ui-topia-production-secret
+                  key: NEXTAUTH_SECRET
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+# Service for Next.js app
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-topia-service
+  namespace: production
+spec:
+  selector:
+    app: ui-topia
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP # For Minikube, this will work with `minikube tunnel`
+---
