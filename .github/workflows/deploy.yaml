@@ -1,4 +1,3 @@
-# .github/workflows/cd-pipeline.yml
 # This workflow is for your CD repository (uitopia-cd)
 name: Infrastructure & Deployment
 
@@ -15,7 +14,7 @@ jobs:
   # Infrastructure job - only runs when terraform files change
   infrastructure:
     runs-on: ubuntu-latest
-    if: contains(toJson(github.event.commits.*.modified), 'terraform-eks/')
+    # if: contains(toJson(github.event.commits.*.modified), 'terraform-eks/')
     outputs:
       cluster-name: ${{ steps.terraform.outputs.cluster-name }}
 
