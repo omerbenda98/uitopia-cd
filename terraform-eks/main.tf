@@ -142,7 +142,7 @@ resource "aws_eks_cluster" "cluster" {
   tags = var.tags
 }
 
-# EKS Node Group and IAM Role
+# EKS Node Group
 resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.cluster.name
   node_group_name = "${var.cluster_name}-nodes"
@@ -153,7 +153,7 @@ resource "aws_eks_node_group" "node_group" {
   capacity_type   = var.node_capacity_type
 
   scaling_config {
-    desired_size = 4 # var.node_desired_size
+    desired_size = var.node_desired_size
     max_size     = var.node_max_size
     min_size     = var.node_min_size
   }
