@@ -53,7 +53,7 @@ jobs:
 
       - name: Install ArgoCD (if cluster was created)
         run: |
-          CLUSTER_NAME=$(cd terraform && terraform output -raw cluster_name)
+          CLUSTER_NAME=$(cd terraform-eks && terraform output -raw cluster_name)
           aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name $CLUSTER_NAME
 
           kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
