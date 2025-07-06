@@ -18,6 +18,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ui-topia-staging-service # Direct reference
+                name: ui-topia-staging-service
                 port:
                   number: 80

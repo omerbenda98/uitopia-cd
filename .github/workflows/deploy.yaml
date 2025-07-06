@@ -1,0 +1,196 @@
+# .github/workflows/cd-pipeline.yml
+# This workflow is for your CD repository (uitopia-cd)
+name: Infrastructure & Deployment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-west-2
+
+jobs:
+  # Infrastructure job - only runs when terraform files change
+  infrastructure:
+    runs-on: ubuntu-latest
+    if: contains(toJson(github.event.commits.*.modified), 'terraform/')
+    outputs:
+      cluster-name: ${{ steps.terraform.outputs.cluster-name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan
+
+      - name: Terraform Apply
+        id: terraform
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve
+          CLUSTER_NAME=$(terraform output -raw cluster_name)
+          echo "cluster-name=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Install ArgoCD (if cluster was created)
+        run: |
+          CLUSTER_NAME=$(cd terraform && terraform output -raw cluster_name)
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name $CLUSTER_NAME
+
+          kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+          kubectl apply -f argocd/
+
+  # Secrets job - runs when secrets or values files change, or after infrastructure
+  manage-secrets:
+    runs-on: ubuntu-latest
+    if: |
+      always() && (
+        needs.infrastructure.result == 'success' || 
+        needs.infrastructure.result == 'skipped' ||
+        contains(toJson(github.event.commits.*.modified), 'helm-charts/') ||
+        contains(toJson(github.event.commits.*.modified), 'secrets/') ||
+        contains(github.event.head_commit.message, 'Update staging version') ||
+        contains(github.event.head_commit.message, 'Update production version')
+      )
+    needs: [infrastructure]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          if [ -n "${{ needs.infrastructure.outputs.cluster-name }}" ]; then
+            CLUSTER_NAME="${{ needs.infrastructure.outputs.cluster-name }}"
+          else
+            CLUSTER_NAME="uitopia-eks-cluster"  # Replace with your actual cluster name
+          fi
+
+          echo "Using cluster: $CLUSTER_NAME"
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name $CLUSTER_NAME
+
+      - name: Apply secrets
+        env:
+          MONGODB_URI_STAGING: ${{ secrets.MONGODB_URI_STAGING }}
+          MONGODB_URI_PRODUCTION: ${{ secrets.MONGODB_URI_PRODUCTION }}
+          GOOGLE_ID: ${{ secrets.GOOGLE_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+        run: |
+          # Create namespaces if they don't exist
+          kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f -
+
+          # Staging secret
+          kubectl create secret generic ui-topia-staging \
+            --from-literal=MONGODB_URI="$MONGODB_URI_STAGING" \
+            --from-literal=GOOGLE_ID="$GOOGLE_ID" \
+            --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+            --from-literal=NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
+            --namespace=staging \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Production secret
+          kubectl create secret generic ui-topia-production \
+            --from-literal=MONGODB_URI="$MONGODB_URI_PRODUCTION" \
+            --from-literal=GOOGLE_ID="$GOOGLE_ID" \
+            --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+            --from-literal=NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
+            --namespace=production \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+  # Verification job - runs after secrets are applied or when helm charts change
+  verify-deployment:
+    runs-on: ubuntu-latest
+    needs: [infrastructure, manage-secrets]
+    if: |
+      always() && (
+        needs.manage-secrets.result == 'success' || 
+        contains(toJson(github.event.commits.*.modified), 'helm-charts/') ||
+        contains(github.event.head_commit.message, 'Update staging version') ||
+        contains(github.event.head_commit.message, 'Update production version')
+      )
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig and verify
+        run: |
+          if [ -n "${{ needs.infrastructure.outputs.cluster-name }}" ]; then
+            CLUSTER_NAME="${{ needs.infrastructure.outputs.cluster-name }}"
+          else
+            CLUSTER_NAME="uitopia-eks-cluster"  # Replace with your actual cluster name
+          fi
+
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name $CLUSTER_NAME
+
+          echo "=== Cluster Status ==="
+          kubectl get nodes
+
+          echo "=== ArgoCD Applications ==="
+          kubectl get applications -n argocd || echo "ArgoCD not installed yet"
+
+          echo "=== Staging Pods ==="
+          kubectl get pods -n staging || echo "Staging namespace not ready yet"
+
+          echo "=== Production Pods ==="
+          kubectl get pods -n production || echo "Production namespace not ready yet"
+
+          echo "=== Ingress ==="
+          kubectl get ingress -A || echo "No ingress found yet"
+
+          echo "=== Recent Helm Values Changes ==="
+          if [ -f "helm-charts/uitopia-app/values-staging.yaml" ]; then
+            echo "Staging image tag:"
+            grep "tag:" helm-charts/uitopia-app/values-staging.yaml || echo "No tag found"
+          fi
+
+          if [ -f "helm-charts/uitopia-app/values-production.yaml" ]; then
+            echo "Production image tag:"
+            grep "tag:" helm-charts/uitopia-app/values-production.yaml || echo "No tag found"
+          fi
+
+      - name: Notify completion
+        run: |
+          echo "✅ CD pipeline completed successfully"
+          echo "🔄 ArgoCD is managing application deployments"
+          echo "🌐 Check ArgoCD UI for application sync status"
+          echo "📱 Apps will be available at:"
+          echo "   - Staging: https://staging.benda.wiki"
+          echo "   - Production: https://benda.wiki"
+
+          # Show what triggered this run
+          echo "🔍 This run was triggered by:"
+          echo "Commit message: ${{ github.event.head_commit.message }}"

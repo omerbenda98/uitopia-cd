@@ -1,18 +1,37 @@
 pipeline {
-    label 'ec2_agent'
+    agent { label 'ec2_agent' }
+    
     environment {
-        email = 'omerbenda98@gmail.com'
+        EMAIL = 'omerbenda98@gmail.com'
+        DOCKER_REGISTRY = 'omerbenda98'  // Your Docker Hub username
+        IMAGE_NAME = 'ui_topia'
+        CD_REPO = 'https://github.com/omerbenda98/uitopia-cd.git'
     }
+    
     stages {
-        stage('Setup') {
+        stage('Setup Tools') {
             steps {
                 sh '''
+                    # Install required tools
                     sudo apt-get update
-                    sudo apt-get install -y ansible
+                    
+                    # Install kubectl
+                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+                    
+                    # Install Terraform
+                    wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+                    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com focal main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+                    sudo apt update && sudo apt install terraform
+                    
+                    # Install yq for YAML manipulation
+                    sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+                    sudo chmod +x /usr/local/bin/yq
                 '''
             }
         }
-        stage('Deploy with terraform'){
+        
+        stage('Infrastructure - EKS Cluster') {
             when { changeset "terraform/**" }
             steps {
                 withAWS(credentials: 'aws') {
@@ -21,92 +40,182 @@ pipeline {
                         terraform init
                         terraform plan
                         terraform apply -auto-approve
+                        
+                        # Get EKS cluster info and update kubeconfig
+                        CLUSTER_NAME=$(terraform output -raw cluster_name)
+                        aws eks update-kubeconfig --region $(terraform output -raw region) --name $CLUSTER_NAME
                     '''
                 }
             }
         }
-        stage('Push updated inventory to Git'){
-            when {
-                expression {
-                    return sh(script: '''
-                        cd ansible
-                        git status --porcelain inventory.ini | grep inventory.ini > /dev/null
-                    ''', returnStatus: true) == 0
+        
+        stage('Install/Update ArgoCD') {
+            when { 
+                anyOf {
+                    changeset "terraform/**"
+                    changeset "argocd/**"
                 }
+            }
+            steps {
+                withAWS(credentials: 'aws') {
+                    sh '''
+                        # Update kubeconfig (in case cluster was just created)
+                        cd terraform
+                        CLUSTER_NAME=$(terraform output -raw cluster_name)
+                        aws eks update-kubeconfig --region $(terraform output -raw region) --name $CLUSTER_NAME
+                        
+                        # Install/Update ArgoCD
+                        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+                        kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+                        
+                        # Wait for ArgoCD to be ready
+                        kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+                        
+                        # Apply ArgoCD applications
+                        kubectl apply -f argocd/
+                    '''
+                }
+            }
+        }
+        
+        stage('Build and Push Docker Image') {
+            when { changeset "**" }  // Build on any change
+            steps {
+                script {
+                    def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                    env.IMAGE_TAG = imageTag
+                    
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        sh '''
+                            # Login to Docker Hub
+                            echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+                            
+                            # Build and push image
+                            docker build -t ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+                            docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                            
+                            # Also tag as latest
+                            docker tag ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
+                            docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Update CD Repository') {
+            when { 
+                expression { return env.IMAGE_TAG != null }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'github_token', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_TOKEN')]) {
                     sh '''
-                        cd ansible
+                        # Clone CD repository
+                        git clone https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/omerbenda98/uitopia-cd.git cd-repo
+                        cd cd-repo
+                        
+                        # Update image tags in values files
+                        yq eval '.app.tag = env(IMAGE_TAG)' -i helm-charts/uitopia-app/values-staging.yaml
+                        yq eval '.app.tag = env(IMAGE_TAG)' -i helm-charts/uitopia-app/values-production.yaml
+                        
+                        # Commit and push changes
                         git config user.name "jenkins"
                         git config user.email "ci@company.com"
-                        git checkout main
-                        git add inventory.ini
-                        git commit -m "🔄 Update inventory from Terraform"
-                        git push https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/yp3yp3/Todo_list-cd.git main
+                        git add .
+                        git commit -m "🚀 Update image tag to ${IMAGE_TAG}" || exit 0
+                        git push origin main
+                        
+                        echo "Updated CD repository with new image tag: ${IMAGE_TAG}"
+                        echo "ArgoCD will automatically deploy this change to staging and production"
                     '''
                 }
             }
         }
-        stage('Deploy with ansible') {
-            when { changeset "ansible/**" }
+        
+        stage('Apply Secrets') {
+            when { changeset "secrets/**" }  // Only if secrets changed
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'ssh', keyFileVariable: 'PEM_FILE', usernameVariable: 'SSH_USER')]) {
+                withAWS(credentials: 'aws') {
                     sh '''
-                        export ANSIBLE_HOST_KEY_CHECKING=False
-                        chmod 400 $PEM_FILE
-                        cd ansible
-                        ansible-playbook -i inventory.ini playbooks/site.yml \
-                        --private-key $PEM_FILE --user $SSH_USER
+                        # Update kubeconfig
+                        cd terraform
+                        CLUSTER_NAME=$(terraform output -raw cluster_name)
+                        aws eks update-kubeconfig --region $(terraform output -raw region) --name $CLUSTER_NAME
+                        
+                        # Apply secrets (these are not in Git for security)
+                        kubectl apply -f secrets/secret.yaml
+                    '''
+                }
+            }
+        }
+        
+        stage('Verify Deployments') {
+            steps {
+                withAWS(credentials: 'aws') {
+                    sh '''
+                        # Update kubeconfig
+                        cd terraform
+                        CLUSTER_NAME=$(terraform output -raw cluster_name)
+                        aws eks update-kubeconfig --region $(terraform output -raw region) --name $CLUSTER_NAME
+                        
+                        # Wait for deployments to be ready
+                        echo "Waiting for staging deployment..."
+                        kubectl wait --for=condition=available --timeout=300s deployment/ui-topia-staging-deployment -n staging || true
+                        
+                        echo "Waiting for production deployment..."
+                        kubectl wait --for=condition=available --timeout=300s deployment/ui-topia-deployment -n production || true
+                        
+                        # Get deployment status
+                        echo "=== Staging Status ==="
+                        kubectl get pods -n staging
+                        
+                        echo "=== Production Status ==="
+                        kubectl get pods -n production
+                        
+                        # Get URLs
+                        echo "=== Access URLs ==="
+                        echo "Staging: https://staging.benda.wiki"
+                        echo "Production: https://benda.wiki"
                     '''
                 }
             }
         }
     }
+    
     post {
+        always {
+            // Clean up Docker images
+            sh 'docker system prune -f || true'
+        }
+        
         failure {
             script {
-                def msg = ''
-                if (env.VERSION && env.ENVIRONMENT) {
-                    msg = "FAILED to deploy ${env.ENVIRONMENT} version ${env.VERSION} "
-                } else {
-                    msg = "FAILED "
+                def msg = "❌ FAILED to deploy UI-Topia"
+                if (env.IMAGE_TAG) {
+                    msg += " with image tag ${env.IMAGE_TAG}"
                 }
-            
+                
                 slackSend(
                     channel: '#jenkins',
                     color: 'danger',
                     message: msg
                 )
-                
-                // emailext(
-                //     subject: "${JOB_NAME}.${BUILD_NUMBER} FAILED",
-                //     mimeType: 'text/html',
-                //     to: "$email",
-                //     body: msg
-                // )
             }
         }
+        
         success {
             script {
-                def msg = ''
-                if (env.VERSION && env.ENVIRONMENT) {
-                    msg = "success to deploy ${env.ENVIRONMENT} version ${env.VERSION}  http://stage.omerbenda98.online/"
-                } else {
-                    msg = "success"
+                def msg = "✅ Successfully deployed UI-Topia"
+                if (env.IMAGE_TAG) {
+                    msg += " with image tag ${env.IMAGE_TAG}"
                 }
+                msg += "\n🌐 Staging: https://staging.benda.wiki\n🚀 Production: https://benda.wiki"
                 
                 slackSend(
                     channel: '#jenkins',
                     color: 'good',
                     message: msg
                 )
-                // emailext(
-                //     subject: "${JOB_NAME}.${BUILD_NUMBER} PASSED",
-                //     mimeType: 'text/html',
-                //     to: "$email",
-                //     body: msg
-                // )
             }
         }
     }

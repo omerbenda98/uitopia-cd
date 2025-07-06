@@ -167,6 +167,7 @@ variable "tags" {
     Environment = "development"
     Project     = "uitopia"
     ManagedBy   = "terraform"
+    
   }
 }
 
