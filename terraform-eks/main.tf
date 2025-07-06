@@ -142,7 +142,7 @@ resource "aws_eks_cluster" "cluster" {
   tags = var.tags
 }
 
-# EKS Node Group
+# EKS Node Group and IAM Role
 resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.cluster.name
   node_group_name = "${var.cluster_name}-nodes"

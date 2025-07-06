@@ -15,7 +15,7 @@ jobs:
   # Infrastructure job - only runs when terraform files change
   infrastructure:
     runs-on: ubuntu-latest
-    if: contains(toJson(github.event.commits.*.modified), 'terraform/')
+    if: contains(toJson(github.event.commits.*.modified), 'terraform-eks/')
     outputs:
       cluster-name: ${{ steps.terraform.outputs.cluster-name }}
 
