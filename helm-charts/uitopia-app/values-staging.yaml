@@ -12,9 +12,12 @@ app:
   env:
     NODE_ENV: staging
 
+  # Secrets enabled for staging
+  secrets: true
+
   # Secrets
   secretRef:
-    name: ui-topia-staging-secret
+    name: ui-topia-staging
 
   # Resource limits (smaller for staging)
   resources:

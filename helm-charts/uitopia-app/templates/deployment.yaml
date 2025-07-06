@@ -26,7 +26,7 @@ spec:
         {{- if .Values.app.secrets }}
         envFrom:
         - secretRef:
-            name: {{ .Values.app.secretRef.name }}-secret
+            name: {{ .Values.app.secretRef.name }}
         {{- end }}
         resources:
           requests:

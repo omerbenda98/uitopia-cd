@@ -12,9 +12,10 @@ app:
   env:
     NODE_ENV: production
 
+  secrets: true
   # Secrets (base64 encode these values)
   secretRef:
-    name: ui-topia-secret
+    name: ui-topia-production
 
   # Resource limits
   resources:
