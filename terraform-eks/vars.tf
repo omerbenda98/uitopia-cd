@@ -167,7 +167,8 @@ variable "tags" {
     Environment = "development"
     Project     = "uitopia"
     ManagedBy   = "terraform"
-    
+    TestRun       = "cd-pipeline-test"  # Add this new tag
+    LastModified  = "2025-01-06"        # Add this new tag
   }
 }
 

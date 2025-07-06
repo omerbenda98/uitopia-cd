@@ -9,7 +9,7 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: us-west-2
+  AWS_REGION: us-east-1
 
 jobs:
   # Infrastructure job - only runs when terraform files change
@@ -36,16 +36,16 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform Init
-        working-directory: terraform
+        working-directory: terraform-eks
         run: terraform init
 
       - name: Terraform Plan
-        working-directory: terraform
+        working-directory: terraform-eks
         run: terraform plan
 
       - name: Terraform Apply
         id: terraform
-        working-directory: terraform
+        working-directory: terraform-eks
         run: |
           terraform apply -auto-approve
           CLUSTER_NAME=$(terraform output -raw cluster_name)
