@@ -9,12 +9,44 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 3.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
   }
 }
+
 
 provider "aws" {
   region = var.aws_region
 }
+# Configure the Helm provider
+provider "helm" {
+  kubernetes = {
+    host                   = aws_eks_cluster.cluster.endpoint
+    cluster_ca_certificate = base64decode(aws_eks_cluster.cluster.certificate_authority[0].data)
+    exec = {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.cluster.name]
+    }
+  }
+}
+# Configure the Kubernetes provider
+provider "kubernetes" {
+  host                   = aws_eks_cluster.cluster.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.cluster.certificate_authority[0].data)
+  exec{
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.cluster.name]
+  }
+}
+
 
 # Data sources
 data "aws_availability_zones" "available" {
@@ -255,13 +287,70 @@ resource "aws_eks_addon" "ebs_csi_driver" {
 
   tags = var.tags
 }
+# Create the ingress-nginx namespace
+# resource "kubernetes_namespace" "ingress_nginx" {
+#   metadata {
+#     name = "ingress-nginx"
+#   }
+#   depends_on = [aws_eks_node_group.node_group]
+# }
 
-# DNS Records will be created manually after ingress is set up
-# You can use your existing DNS module later to automate this
 
-# External-DNS IAM Role
+# Install NGINX Ingress Controller using Helm
+resource "helm_release" "ingress_nginx" {
+  name       = "ingress-nginx"
+  repository = "https://kubernetes.github.io/ingress-nginx"
+  chart      = "ingress-nginx"
+  namespace  = "ingress-nginx"
+
+  # Use the latest version or specify a version
+  version = var.ingress_nginx_version # Add this variable to your variables.tf
+
+  # Configure the ingress controller
+  set = [
+    {
+      name  = "controller.service.type"
+      value = "LoadBalancer"
+    },
+    {
+      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"
+      value = "nlb"
+    },
+    {
+      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
+      value = "internet-facing"
+    },
+    {
+      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-cross-zone-load-balancing-enabled"
+      value = "true"
+    },
+    {
+      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-backend-protocol"
+      value = "tcp"
+    },
+    {
+      name  = "controller.config.ssl-redirect"
+      value = "false"
+    },
+    {
+      name  = "controller.config.use-proxy-protocol"
+      value = "false"
+    },
+    {
+      name  = "controller.admissionWebhooks.enabled"
+      value = "false"
+    }
+  ]
+
+  depends_on = [
+    aws_eks_node_group.node_group,
+    null_resource.wait_for_cluster
+  ]
+
+  timeout = 600
+}
 resource "aws_iam_role" "external_dns" {
-  name = "${var.cluster_name}-external-dns"
+  name = "${var.cluster_name}-external-dns-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -285,9 +374,9 @@ resource "aws_iam_role" "external_dns" {
   tags = var.tags
 }
 
-# External-DNS IAM Policy (gives it permission to manage Route53)
+# External-DNS IAM Policy
 resource "aws_iam_policy" "external_dns" {
-  name = "${var.cluster_name}-external-dns"
+  name = "${var.cluster_name}-external-dns-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -303,7 +392,8 @@ resource "aws_iam_policy" "external_dns" {
         Effect = "Allow"
         Action = [
           "route53:ListHostedZones",
-          "route53:ListResourceRecordSets"
+          "route53:ListResourceRecordSets",
+          "route53:GetChange"
         ]
         Resource = "*"
       }
@@ -312,13 +402,92 @@ resource "aws_iam_policy" "external_dns" {
 
   tags = var.tags
 }
-
 resource "aws_iam_role_policy_attachment" "external_dns" {
   policy_arn = aws_iam_policy.external_dns.arn
   role       = aws_iam_role.external_dns.name
 }
 
-# Output the role ARN so you can use it in the next step
-output "external_dns_role_arn" {
-  value = aws_iam_role.external_dns.arn
+
+
+resource "kubernetes_namespace" "external_dns" {
+  metadata {
+    name = "external-dns"
+  }
+  depends_on = [aws_eks_node_group.node_group]
 }
+
+
+# Create the external-dns service account
+resource "kubernetes_service_account" "external_dns" {
+  metadata {
+    name      = "external-dns"
+    namespace = kubernetes_namespace.external_dns.metadata[0].name
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.external_dns.arn
+    }
+  }
+  depends_on = [aws_iam_role_policy_attachment.external_dns]
+}
+
+# Install external-dns using Helm
+resource "helm_release" "external_dns" {
+  name       = "external-dns"
+  repository = "https://kubernetes-sigs.github.io/external-dns"
+  chart      = "external-dns"
+  namespace  = kubernetes_namespace.external_dns.metadata[0].name
+  version    = var.external_dns_version
+
+  set = concat([
+    {
+      name  = "serviceAccount.create"
+      value = "false"
+    },
+    {
+      name  = "serviceAccount.name"
+      value = kubernetes_service_account.external_dns.metadata[0].name
+    },
+    {
+      name  = "provider"
+      value = "aws"
+    },
+    {
+      name  = "aws.region"
+      value = var.aws_region
+    },
+    {
+      name  = "txtOwnerId"
+      value = var.cluster_name
+    },
+    {
+      name  = "sources[0]"
+      value = "service"
+    },
+    {
+      name  = "sources[1]"
+      value = "ingress"
+    },
+    {
+      name  = "logLevel"
+      value = "info"
+    },
+    {
+      name  = "dryRun"
+      value = var.external_dns_dry_run ? "true" : "false"
+    }
+  ], var.external_dns_domain_filters != null ? [
+    for i, domain in var.external_dns_domain_filters : {
+      name  = "domainFilters[${i}]"
+      value = domain
+    }
+  ] : [])
+
+  depends_on = [
+    aws_eks_node_group.node_group,
+    kubernetes_service_account.external_dns,
+    helm_release.ingress_nginx
+  ]
+
+  timeout = 300
+}
+
+

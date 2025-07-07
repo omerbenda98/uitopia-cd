@@ -4,7 +4,7 @@ namespace: production
 app:
   name: ui-topia
   image: omerbenda98/ui_topia
-  tag: latest
+  tag: 3
   port: 3000
   replicas: 2
 

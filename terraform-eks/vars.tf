@@ -190,3 +190,38 @@ variable "enable_metrics_server" {
   type        = bool
   default     = true
 }
+
+
+# Add these to your existing variables.tf file
+
+variable "ingress_nginx_version" {
+  description = "Version of the ingress-nginx Helm chart"
+  type        = string
+  default     = "4.8.3"  # Use a specific version for reproducibility
+}
+
+# If you want to make the ingress controller installation optional
+variable "install_ingress_nginx" {
+  description = "Whether to install the NGINX Ingress Controller"
+  type        = bool
+  default     = true
+}
+
+# External-DNS configuration variables
+variable "external_dns_version" {
+  description = "Version of the external-dns Helm chart"
+  type        = string
+  default     = "1.14.3"
+}
+
+variable "external_dns_domain_filters" {
+  description = "List of domains that external-dns should manage (e.g., ['example.com', 'subdomain.example.com'])"
+  type        = list(string)
+  default     = null  # Set to null to manage all domains, or specify specific domains
+}
+
+variable "external_dns_dry_run" {
+  description = "Enable dry-run mode for external-dns (useful for testing)"
+  type        = bool
+  default     = false  # Set to true initially for testing, then false for production
+}

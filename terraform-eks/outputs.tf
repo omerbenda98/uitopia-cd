@@ -150,3 +150,27 @@ output "useful_commands" {
     get_nodegroup       = "aws eks describe-nodegroup --cluster-name ${aws_eks_cluster.cluster.name} --nodegroup-name ${aws_eks_node_group.node_group.node_group_name} --region ${var.aws_region}"
   }
 }
+# Outputs
+# output "cluster_endpoint" {
+#   description = "EKS cluster endpoint"
+#   value       = aws_eks_cluster.cluster.endpoint
+# }
+
+# output "cluster_security_group_id" {
+#   description = "Security group ID attached to the EKS cluster"
+#   value       = aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id
+# }
+
+# output "cluster_name" {
+#   description = "EKS cluster name"
+#   value       = aws_eks_cluster.cluster.name
+# }
+
+# output "external_dns_role_arn" {
+#   description = "ARN of the External DNS IAM role"
+#   value       = aws_iam_role.external_dns.arn
+# }
+# output "ingress_nginx_load_balancer_hostname" {
+#   description = "Load balancer hostname created by ingress-nginx"
+#   value       = helm_release.ingress_nginx.status[0].load_balancer[0].ingress[0].hostname
+# }
