@@ -1,22 +1,18 @@
 # values-production.yaml
 namespace: production
-
 app:
   name: ui-topia
   image: omerbenda98/ui_topia
-  tag: 1
+  tag: 3
   port: 3000
   replicas: 2
-
   # Environment variables
   env:
     NODE_ENV: production
-
   secrets: true
   # Secrets (base64 encode these values)
   secretRef:
     name: ui-topia-production
-
   # Resource limits
   resources:
     requests:
@@ -25,22 +21,18 @@ app:
     limits:
       cpu: 500m
       memory: 512Mi
-
 service:
   port: 80
   type: ClusterIP
-
 ingress:
   enabled: true
   host: benda.wiki
-
 # HPA for production
 hpa:
   enabled: true
   minReplicas: 2
   maxReplicas: 10
   targetCPU: 70
-
 # No MongoDB in production (using external DB)
 mongodb:
   enabled: false
