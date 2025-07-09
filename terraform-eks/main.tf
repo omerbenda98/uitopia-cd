@@ -288,12 +288,12 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   tags = var.tags
 }
 # Create the ingress-nginx namespace
-# resource "kubernetes_namespace" "ingress_nginx" {
-#   metadata {
-#     name = "ingress-nginx"
-#   }
-#   depends_on = [aws_eks_node_group.node_group]
-# }
+resource "kubernetes_namespace" "ingress_nginx" {
+  metadata {
+    name = "ingress-nginx"
+  }
+  depends_on = [aws_eks_node_group.node_group]
+}
 
 
 # Install NGINX Ingress Controller using Helm
@@ -313,27 +313,11 @@ resource "helm_release" "ingress_nginx" {
       value = "LoadBalancer"
     },
     {
-      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"
-      value = "nlb"
-    },
-    {
       name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
       value = "internet-facing"
     },
     {
-      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-cross-zone-load-balancing-enabled"
-      value = "true"
-    },
-    {
-      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-backend-protocol"
-      value = "tcp"
-    },
-    {
       name  = "controller.config.ssl-redirect"
-      value = "false"
-    },
-    {
-      name  = "controller.config.use-proxy-protocol"
       value = "false"
     },
     {
