@@ -14,7 +14,7 @@ jobs:
   # Infrastructure job - only runs when terraform files change
   infrastructure:
     runs-on: ubuntu-latest
-    # if: contains(toJson(github.event.commits.*.modified), 'terraform-eks/')
+    if: contains(toJson(github.event.commits.*.modified), 'terraform-eks/')
     outputs:
       cluster-name: ${{ steps.terraform.outputs.cluster-name }}
 
@@ -58,7 +58,7 @@ jobs:
           kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
           kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
-          kubectl apply -f argocd/
+          kubectl apply -f k8s/argocd/
 
   # Secrets job - runs when secrets or values files change, or after infrastructure
   manage-secrets:
@@ -171,12 +171,12 @@ jobs:
           kubectl get ingress -A || echo "No ingress found yet"
 
           echo "=== Recent Helm Values Changes ==="
-          if [ -f "helm-charts/uitopia-app/values-staging.yaml" ]; then
+          if [ -f "k8s/helm-charts/uitopia-app/values-staging.yaml" ]; then
             echo "Staging image tag:"
             grep "tag:" helm-charts/uitopia-app/values-staging.yaml || echo "No tag found"
           fi
 
-          if [ -f "helm-charts/uitopia-app/values-production.yaml" ]; then
+          if [ -f "k8s/helm-charts/uitopia-app/values-production.yaml" ]; then
             echo "Production image tag:"
             grep "tag:" helm-charts/uitopia-app/values-production.yaml || echo "No tag found"
           fi
