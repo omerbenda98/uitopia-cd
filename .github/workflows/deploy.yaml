@@ -102,6 +102,9 @@ jobs:
           GOOGLE_ID: ${{ secrets.GOOGLE_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL_STAGING: ${{ secrets.NEXTAUTH_URL_STAGING }}
+          NEXTAUTH_URL_PRODUCTION: ${{ secrets.NEXTAUTH_URL_PRODUCTION }}
+
         run: |
           # Create namespaces if they don't exist
           kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
@@ -113,6 +116,8 @@ jobs:
             --from-literal=GOOGLE_ID="$GOOGLE_ID" \
             --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
             --from-literal=NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
+            --from-literal=NEXTAUTH_URL="$NEXTAUTH_URL_STAGING" \
+            --from-literal=NEXTAUTH_URL_INTERNAL="$NEXTAUTH_URL_STAGING" \
             --namespace=staging \
             --dry-run=client -o yaml | kubectl apply -f -
 
@@ -122,6 +127,8 @@ jobs:
             --from-literal=GOOGLE_ID="$GOOGLE_ID" \
             --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
             --from-literal=NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
+            --from-literal=NEXTAUTH_URL="$NEXTAUTH_URL_PRODUCTION" \
+            --from-literal=NEXTAUTH_URL_INTERNAL="$NEXTAUTH_URL_PRODUCTION" \
             --namespace=production \
             --dry-run=client -o yaml | kubectl apply -f -
 

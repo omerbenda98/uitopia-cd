@@ -288,190 +288,49 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   tags = var.tags
 }
 # Create the ingress-nginx namespace
-resource "kubernetes_namespace" "ingress_nginx" {
-  metadata {
-    name = "ingress-nginx"
-  }
-  depends_on = [aws_eks_node_group.node_group]
-}
+# resource "kubernetes_namespace" "ingress_nginx" {
+#   metadata {
+#     name = "ingress-nginx"
+#   }
+#   depends_on = [aws_eks_node_group.node_group]
+# }
 
 
-# Install NGINX Ingress Controller using Helm
-resource "helm_release" "ingress_nginx" {
-  name       = "ingress-nginx"
-  repository = "https://kubernetes.github.io/ingress-nginx"
-  chart      = "ingress-nginx"
-  namespace  = "ingress-nginx"
+# # Install NGINX Ingress Controller using Helm
+# resource "helm_release" "ingress_nginx" {
+#   name       = "ingress-nginx"
+#   repository = "https://kubernetes.github.io/ingress-nginx"
+#   chart      = "ingress-nginx"
+#   namespace  = "ingress-nginx"
 
-  # Use the latest version or specify a version
-  version = var.ingress_nginx_version # Add this variable to your variables.tf
+#   # Use the latest version or specify a version
+#   version = var.ingress_nginx_version # Add this variable to your variables.tf
 
-  # Configure the ingress controller
-  set = [
-    {
-      name  = "controller.service.type"
-      value = "LoadBalancer"
-    },
-    {
-      name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
-      value = "internet-facing"
-    },
-    {
-      name  = "controller.config.ssl-redirect"
-      value = "false"
-    },
-    {
-      name  = "controller.admissionWebhooks.enabled"
-      value = "false"
-    }
-  ]
+#   # Configure the ingress controller
+#   set = [
+#     {
+#       name  = "controller.service.type"
+#       value = "LoadBalancer"
+#     },
+#     {
+#       name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
+#       value = "internet-facing"
+#     },
+#     {
+#       name  = "controller.config.ssl-redirect"
+#       value = "false"
+#     },
+#     {
+#       name  = "controller.admissionWebhooks.enabled"
+#       value = "false"
+#     }
+#   ]
 
-  depends_on = [
-    aws_eks_node_group.node_group,
-    null_resource.wait_for_cluster
-  ]
+#   depends_on = [
+#     aws_eks_node_group.node_group,
+#     null_resource.wait_for_cluster
+#   ]
 
-  timeout = 600
-}
-resource "aws_iam_role" "external_dns" {
-  name = "${var.cluster_name}-external-dns-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = aws_iam_openid_connect_provider.cluster.arn
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "${replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")}:sub": "system:serviceaccount:external-dns:external-dns"
-            "${replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")}:aud": "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-
-  tags = var.tags
-}
-
-# External-DNS IAM Policy
-resource "aws_iam_policy" "external_dns" {
-  name = "${var.cluster_name}-external-dns-policy"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "route53:ChangeResourceRecordSets"
-        ]
-        Resource = "arn:aws:route53:::hostedzone/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "route53:ListHostedZones",
-          "route53:ListResourceRecordSets",
-          "route53:GetChange"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-
-  tags = var.tags
-}
-resource "aws_iam_role_policy_attachment" "external_dns" {
-  policy_arn = aws_iam_policy.external_dns.arn
-  role       = aws_iam_role.external_dns.name
-}
-
-
-
-resource "kubernetes_namespace" "external_dns" {
-  metadata {
-    name = "external-dns"
-  }
-  depends_on = [aws_eks_node_group.node_group]
-}
-
-
-# Create the external-dns service account
-resource "kubernetes_service_account" "external_dns" {
-  metadata {
-    name      = "external-dns"
-    namespace = kubernetes_namespace.external_dns.metadata[0].name
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.external_dns.arn
-    }
-  }
-  depends_on = [aws_iam_role_policy_attachment.external_dns]
-}
-
-# Install external-dns using Helm
-resource "helm_release" "external_dns" {
-  name       = "external-dns"
-  repository = "https://kubernetes-sigs.github.io/external-dns"
-  chart      = "external-dns"
-  namespace  = kubernetes_namespace.external_dns.metadata[0].name
-  version    = var.external_dns_version
-
-  set = concat([
-    {
-      name  = "serviceAccount.create"
-      value = "false"
-    },
-    {
-      name  = "serviceAccount.name"
-      value = kubernetes_service_account.external_dns.metadata[0].name
-    },
-    {
-      name  = "provider"
-      value = "aws"
-    },
-    {
-      name  = "aws.region"
-      value = var.aws_region
-    },
-    {
-      name  = "txtOwnerId"
-      value = var.cluster_name
-    },
-    {
-      name  = "sources[0]"
-      value = "service"
-    },
-    {
-      name  = "sources[1]"
-      value = "ingress"
-    },
-    {
-      name  = "logLevel"
-      value = "info"
-    },
-    {
-      name  = "dryRun"
-      value = var.external_dns_dry_run ? "true" : "false"
-    }
-  ], var.external_dns_domain_filters != null ? [
-    for i, domain in var.external_dns_domain_filters : {
-      name  = "domainFilters[${i}]"
-      value = domain
-    }
-  ] : [])
-
-  depends_on = [
-    aws_eks_node_group.node_group,
-    kubernetes_service_account.external_dns,
-    helm_release.ingress_nginx
-  ]
-
-  timeout = 300
-}
-
+#   timeout = 600
+# }
 

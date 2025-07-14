@@ -220,8 +220,16 @@ variable "external_dns_domain_filters" {
   default     = null  # Set to null to manage all domains, or specify specific domains
 }
 
-variable "external_dns_dry_run" {
-  description = "Enable dry-run mode for external-dns (useful for testing)"
-  type        = bool
-  default     = false  # Set to true initially for testing, then false for production
+
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "eu-central-1"
+}
+
+variable "url_site" {
+  description = "Domain name"
+  type        = string
+  default     = "benda.wiki" # Replace with your actual domain
+  
 }

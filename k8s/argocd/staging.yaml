@@ -11,7 +11,7 @@ spec:
 
   source:
     repoURL: https://github.com/omerbenda98/uitopia-cd
-    path: helm-charts/uitopia-app
+    path: k8s/helm-charts/uitopia-app
     targetRevision: HEAD
     helm:
       valueFiles:
