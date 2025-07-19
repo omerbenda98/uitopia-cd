@@ -58,25 +58,8 @@ resource "aws_iam_role_policy_attachment" "external_dns" {
 
 
 
-# resource "kubernetes_namespace" "external_dns" {
-#   metadata {
-#     name = "external-dns"
-#   }
-#   depends_on = [aws_eks_node_group.node_group]
-# }
 
 
-# Create the external-dns service account
-resource "kubernetes_service_account" "external_dns" {
-  metadata {
-    name      = "external-dns"
-    namespace = "external-dns"
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.external_dns.arn
-    }
-  }
-  depends_on = [aws_iam_role_policy_attachment.external_dns]
-}
 
 # Install external-dns using Helm
 resource "helm_release" "external_dns" {
@@ -90,11 +73,15 @@ resource "helm_release" "external_dns" {
   set = concat([
     {
       name  = "serviceAccount.create"
-      value = "false"
+      value = "true"
     },
     {
       name  = "serviceAccount.name"
-      value = kubernetes_service_account.external_dns.metadata[0].name
+      value = "external-dns"
+    },
+    {
+      name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+      value = aws_iam_role.external_dns.arn
     },
     {
       name  = "provider"
@@ -129,7 +116,7 @@ resource "helm_release" "external_dns" {
 
   depends_on = [
     aws_eks_node_group.node_group,
-    kubernetes_service_account.external_dns,
+    aws_iam_role_policy_attachment.external_dns,
     helm_release.ingress_nginx
   ]
 

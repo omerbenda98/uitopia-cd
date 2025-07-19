@@ -1,0 +1,131 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 75.10.0
+    chart: kube-prometheus-stack
+    helm:
+      values: |
+        # Global settings
+        global:
+          rbac:
+            create: true
+            pspEnabled: false
+
+        # Grafana configuration
+        grafana:
+          enabled: true
+          adminPassword: "admin" # Change this or use a secret
+          persistence:
+            enabled: true
+            size: 10Gi
+            storageClassName: gp3 # Adjust for your EKS storage class
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+              cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
+            hosts:
+              - grafana.benda.wiki
+            tls:
+              - secretName: grafana-tls
+                hosts:
+                  - grafana.benda.wiki
+
+        # Prometheus configuration
+        prometheus:
+          enabled: true
+          prometheusSpec:
+            retention: 30d
+            retentionSize: 50GB
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp3 # Adjust for your EKS storage class
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 50Gi
+            resources:
+              requests:
+                memory: 2Gi
+                cpu: 1000m
+              limits:
+                memory: 4Gi
+                cpu: 2000m
+            # Service discovery for EKS
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+              cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
+            hosts:
+              - prometheus.benda.wiki
+            tls:
+              - secretName: prometheus-tls
+                hosts:
+                  - prometheus.benda.wiki
+
+        # Alertmanager configuration
+        alertmanager:
+          enabled: true
+          alertmanagerSpec:
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp3 # Adjust for your EKS storage class
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 10Gi
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+              cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
+            hosts:
+              - alertmanager.benda.wiki
+            tls:
+              - secretName: alertmanager-tls
+                hosts:
+                  - alertmanager.benda.wiki
+
+        # Node Exporter
+        nodeExporter:
+          enabled: true
+
+        # Kube State Metrics
+        kubeStateMetrics:
+          enabled: true
+
+        # Additional scrape configs for EKS-specific metrics
+        prometheusOperator:
+          enabled: true
+          # Ensure CRDs are managed properly
+          manageCrds: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - Replace=true

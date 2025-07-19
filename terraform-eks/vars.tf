@@ -233,3 +233,179 @@ variable "url_site" {
   default     = "benda.wiki" # Replace with your actual domain
   
 }
+# monitoring-variables.tf - Variables for monitoring stack
+
+# Kube Prometheus Stack version
+variable "kube_prometheus_stack_version" {
+  description = "Version of kube-prometheus-stack Helm chart"
+  type        = string
+  default     = "75.10.0"  # Latest stable version as of 2025
+}
+
+# Prometheus configuration
+variable "prometheus_storage_size" {
+  description = "Storage size for Prometheus"
+  type        = string
+  default     = "50Gi"
+}
+
+variable "prometheus_retention" {
+  description = "Prometheus data retention period"
+  type        = string
+  default     = "30d"
+}
+
+variable "prometheus_retention_size" {
+  description = "Prometheus data retention size"
+  type        = string
+  default     = "45GiB"
+}
+
+variable "prometheus_cpu_limit" {
+  description = "CPU limit for Prometheus"
+  type        = string
+  default     = "2000m"
+}
+
+variable "prometheus_memory_limit" {
+  description = "Memory limit for Prometheus"
+  type        = string
+  default     = "8Gi"
+}
+
+variable "prometheus_cpu_request" {
+  description = "CPU request for Prometheus"
+  type        = string
+  default     = "1000m"
+}
+
+variable "prometheus_memory_request" {
+  description = "Memory request for Prometheus"
+  type        = string
+  default     = "4Gi"
+}
+
+# Alertmanager configuration
+variable "alertmanager_storage_size" {
+  description = "Storage size for Alertmanager"
+  type        = string
+  default     = "5Gi"
+}
+
+variable "alertmanager_retention" {
+  description = "Alertmanager data retention period"
+  type        = string
+  default     = "120h"
+}
+
+variable "alertmanager_cpu_limit" {
+  description = "CPU limit for Alertmanager"
+  type        = string
+  default     = "100m"
+}
+
+variable "alertmanager_memory_limit" {
+  description = "Memory limit for Alertmanager"
+  type        = string
+  default     = "256Mi"
+}
+
+variable "alertmanager_cpu_request" {
+  description = "CPU request for Alertmanager"
+  type        = string
+  default     = "50m"
+}
+
+variable "alertmanager_memory_request" {
+  description = "Memory request for Alertmanager"
+  type        = string
+  default     = "128Mi"
+}
+
+# Grafana configuration
+variable "grafana_admin_password" {
+  description = "Admin password for Grafana"
+  type        = string
+  default     = "admin"
+  sensitive   = true
+}
+
+variable "grafana_persistence_enabled" {
+  description = "Enable persistence for Grafana"
+  type        = bool
+  default     = true
+}
+
+variable "grafana_storage_size" {
+  description = "Storage size for Grafana"
+  type        = string
+  default     = "10Gi"
+}
+
+
+variable "grafana_cpu_limit" {
+  description = "CPU limit for Grafana"
+  type        = string
+  default     = "200m"
+}
+
+variable "grafana_memory_limit" {
+  description = "Memory limit for Grafana"
+  type        = string
+  default     = "256Mi"
+}
+
+variable "grafana_cpu_request" {
+  description = "CPU request for Grafana"
+  type        = string
+  default     = "100m"
+}
+
+variable "grafana_memory_request" {
+  description = "Memory request for Grafana"
+  type        = string
+  default     = "128Mi"
+}
+
+variable "grafana_plugins" {
+  description = "List of Grafana plugins to install"
+  type        = list(string)
+  default     = []
+}
+
+variable "grafana_root_url" {
+  description = "Root URL for Grafana"
+  type        = string
+  default     = ""
+}
+
+# DNS and Ingress variables
+variable "create_grafana_dns_record" {
+  description = "Create DNS A record for Grafana"
+  type        = bool
+  default     = true
+}
+
+variable "hosted_zone_id" {
+  description = "Route53 hosted zone ID for benda.wiki"
+  type        = string
+  default     = "Z01359572SN6H2QBYEJGW"  # Add your hosted zone ID
+}
+
+variable "aws_elb_zone_id" {
+  description = "AWS ELB zone ID for your region"
+  type        = string
+  default     = "Z35SXDOTRQ7X7K"  # us-east-1, change if different region
+}
+
+# Update your existing grafana_service_type default
+variable "grafana_service_type" {
+  description = "Service type for Grafana"
+  type        = string
+  default     = "ClusterIP"  # Changed from "LoadBalancer"
+  
+  validation {
+    condition     = contains(["ClusterIP", "NodePort", "LoadBalancer"], var.grafana_service_type)
+    error_message = "Grafana service type must be ClusterIP, NodePort, or LoadBalancer."
+  }
+}
