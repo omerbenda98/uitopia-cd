@@ -26,13 +26,12 @@ spec:
           persistence:
             enabled: true
             size: 10Gi
-            storageClassName: gp3 # Adjust for your EKS storage class
+            storageClassName: gp2 # Adjust for your EKS storage class
           ingress:
             enabled: true
             ingressClassName: nginx
             annotations:
               nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-              cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
             hosts:
               - grafana.benda.wiki
             tls:
@@ -49,7 +48,7 @@ spec:
             storageSpec:
               volumeClaimTemplate:
                 spec:
-                  storageClassName: gp3 # Adjust for your EKS storage class
+                  storageClassName: gp2 # Adjust for your EKS storage class
                   accessModes: ["ReadWriteOnce"]
                   resources:
                     requests:
@@ -70,7 +69,6 @@ spec:
             ingressClassName: nginx
             annotations:
               nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-              cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
             hosts:
               - prometheus.benda.wiki
             tls:
@@ -85,7 +83,7 @@ spec:
             storage:
               volumeClaimTemplate:
                 spec:
-                  storageClassName: gp3 # Adjust for your EKS storage class
+                  storageClassName: gp2 # Adjust for your EKS storage class
                   accessModes: ["ReadWriteOnce"]
                   resources:
                     requests:
@@ -95,7 +93,6 @@ spec:
             ingressClassName: nginx
             annotations:
               nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-              cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
             hosts:
               - alertmanager.benda.wiki
             tls:
@@ -129,3 +126,9 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - Replace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
