@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kube-prometheus-stack
+  name: kube-prometheus-stack-minimal
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -15,105 +15,48 @@ spec:
     chart: kube-prometheus-stack
     helm:
       values: |
-        # Global settings
-        global:
-          rbac:
-            create: true
-            pspEnabled: false
-
-        # Grafana configuration
+        # Minimal configuration for testing
         grafana:
           enabled: true
-          adminPassword: "admin" 
+          adminPassword: "admin"
           persistence:
-            enabled: true
-            size: 10Gi
-            storageClassName: gp2
+            enabled: false  # Disable persistence for now
           ingress:
-            enabled: true
-            ingressClassName: nginx
-            annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-            hosts:
-              - grafana.benda.wiki
-            tls:
-              - secretName: grafana-tls
-                hosts:
-                  - grafana.benda.wiki
+            enabled: false  # Disable ingress for now
 
-        # Prometheus configuration
         prometheus:
           enabled: true
           prometheusSpec:
-            retention: 30d
-            retentionSize: 50GB
-            storageSpec:
-              volumeClaimTemplate:
-                spec:
-                  storageClassName: gp2 # Adjust for your EKS storage class
-                  accessModes: ["ReadWriteOnce"]
-                  resources:
-                    requests:
-                      storage: 50Gi
+            retention: 7d
+            # Remove storage for now
+            # storageSpec: null
             resources:
               requests:
+                memory: 1Gi
+                cpu: 500m
+              limits:
                 memory: 2Gi
                 cpu: 1000m
-              limits:
-                memory: 4Gi
-                cpu: 2000m
-            # Service discovery for EKS
-            serviceMonitorSelectorNilUsesHelmValues: false
-            podMonitorSelectorNilUsesHelmValues: false
-            ruleSelectorNilUsesHelmValues: false
           ingress:
-            enabled: true
-            ingressClassName: nginx
-            annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-            hosts:
-              - prometheus.benda.wiki
-            tls:
-              - secretName: prometheus-tls
-                hosts:
-                  - prometheus.benda.wiki
+            enabled: false  # Disable ingress for now
 
-        # Alertmanager configuration
         alertmanager:
           enabled: true
           alertmanagerSpec:
-            storage:
-              volumeClaimTemplate:
-                spec:
-                  storageClassName: gp2 # Adjust for your EKS storage class
-                  accessModes: ["ReadWriteOnce"]
-                  resources:
-                    requests:
-                      storage: 10Gi
+            # Remove storage for now
+            storage: null
           ingress:
-            enabled: true
-            ingressClassName: nginx
-            annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-            hosts:
-              - alertmanager.benda.wiki
-            tls:
-              - secretName: alertmanager-tls
-                hosts:
-                  - alertmanager.benda.wiki
+            enabled: false  # Disable ingress for now
 
-        # Node Exporter
+        # Keep these enabled as they're core components
         nodeExporter:
           enabled: true
 
-        # Kube State Metrics
         kubeStateMetrics:
           enabled: true
 
-        # Additional scrape configs for EKS-specific metrics
         prometheusOperator:
           enabled: true
-          # Ensure CRDs are managed properly
           manageCrds: true
 
   destination:
@@ -127,8 +70,6 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - Replace=true
-      - Force=true
     retry:
       limit: 5
       backoff:
