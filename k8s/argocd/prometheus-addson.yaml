@@ -5,6 +5,8 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
@@ -13,8 +15,6 @@ spec:
     targetRevision: HEAD
     directory:
       recurse: true
-      # Optional: exclude certain files
-      # exclude: "*.tmp"
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
@@ -25,7 +25,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-  # Use sync waves to ensure prometheus-stack deploys first
-  metadata:
-    annotations:
-      argocd.argoproj.io/sync-wave: "1"
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

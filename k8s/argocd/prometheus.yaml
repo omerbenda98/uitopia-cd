@@ -5,6 +5,8 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
   source:
@@ -22,11 +24,11 @@ spec:
         # Grafana configuration
         grafana:
           enabled: true
-          adminPassword: "admin" # Change this or use a secret
+          adminPassword: "admin" 
           persistence:
             enabled: true
             size: 10Gi
-            storageClassName: gp2 # Adjust for your EKS storage class
+            storageClassName: gp2
           ingress:
             enabled: true
             ingressClassName: nginx
