@@ -3,7 +3,7 @@ namespace: staging
 app:
   name: ui-topia-staging
   image: omerbenda98/ui_topia
-  tag: 9
+  tag: 11
   port: 3000
   replicas: 1
   # Environment variables
