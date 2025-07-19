@@ -22,31 +22,34 @@ spec:
           persistence:
             enabled: false  # Disable persistence for now
           ingress:
-            enabled: false  # Disable ingress for now
-
+            enabled: true   # ENABLE THIS for external-DNS to work
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+              # external-dns will automatically pick this up
+            hosts:
+              - grafana.benda.wiki
+              
         prometheus:
           enabled: true
-          prometheusSpec:
-            retention: 7d
-            # Remove storage for now
-            # storageSpec: null
-            resources:
-              requests:
-                memory: 1Gi
-                cpu: 500m
-              limits:
-                memory: 2Gi
-                cpu: 1000m
+          
           ingress:
-            enabled: false  # Disable ingress for now
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+            hosts:
+              - prometheus.benda.wiki
 
         alertmanager:
           enabled: true
-          alertmanagerSpec:
-            # Remove storage for now
-            storage: null
           ingress:
-            enabled: false  # Disable ingress for now
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+            hosts:
+              - alertmanager.benda.wiki
 
         # Keep these enabled as they're core components
         nodeExporter:
